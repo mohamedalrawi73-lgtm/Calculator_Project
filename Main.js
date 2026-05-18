@@ -6,20 +6,21 @@ const updateDisplay = () => {
   display.value = expression;
 };
 
-const appendToken = (token) => {
-  const lastChar = expression.slice(-1);
-  const operators = ["+", "-", "*", "/"];
+const isOperator = (char) => ["+", "-", "*", "/", "%", "^"].includes(char);
 
-  if (operators.includes(token)) {
-    if (!expression) return;
-    if (operators.includes(lastChar)) {
-      expression = expression.slice(0, -1) + token;
-      updateDisplay();
-      return;
-    }
+const appendParenthesis = () => {
+  const openCount = (expression.match(/\(/g) || []).length;
+  const closeCount = (expression.match(/\)/g) || []).length;
+  const lastChar = expression.slice(-1);
+
+  if (!expression || isOperator(lastChar) || lastChar === "(") {
+    expression += "(";
+  } else if (openCount > closeCount && lastChar !== "(") {
+    expression += ")";
+  } else {
+    expression += "(";
   }
 
-  expression += token;
   updateDisplay();
 };
 
@@ -35,18 +36,43 @@ const applyPercent = () => {
   updateDisplay();
 };
 
+const backspace = () => {
+  expression = expression.slice(0, -1);
+  updateDisplay();
+};
+
 const clearDisplay = () => {
   expression = "";
   updateDisplay();
 };
 
+const factorial = (n) => {
+  if (n < 0 || !Number.isInteger(n)) return NaN;
+  let result = 1;
+  for (let i = 2; i <= n; i += 1) {
+    result *= i;
+  }
+  return result;
+};
+
 const calculateResult = () => {
   if (!expression) return;
 
-  const cleanedExpression = expression.replace(/%/g, "/100");
+  let cleanedExpression = expression;
+
+  cleanedExpression = cleanedExpression.replace(/π/g, "Math.PI");
+  cleanedExpression = cleanedExpression.replace(/√\(/g, "Math.sqrt(");
+  cleanedExpression = cleanedExpression.replace(/\blog\(/g, "Math.log10(");
+  cleanedExpression = cleanedExpression.replace(/\bln\(/g, "Math.log(");
+  cleanedExpression = cleanedExpression.replace(/\bsin\(/g, "Math.sin(");
+  cleanedExpression = cleanedExpression.replace(/\bcos\(/g, "Math.cos(");
+  cleanedExpression = cleanedExpression.replace(/\btan\(/g, "Math.tan(");
+  cleanedExpression = cleanedExpression.replace(/\bmod\b/g, "%");
+  cleanedExpression = cleanedExpression.replace(/\^/g, "**");
+  cleanedExpression = cleanedExpression.replace(/(\d+\.?\d*|\([^()]+\))!/g, "factorial($1)");
 
   try {
-    const result = Function("'use strict'; return (" + cleanedExpression + ")")();
+    const result = new Function("factorial", "return (" + cleanedExpression + ")")(factorial);
     expression = Number.isFinite(result) ? String(result) : "";
     updateDisplay();
   } catch (error) {
@@ -55,26 +81,101 @@ const calculateResult = () => {
   }
 };
 
+const appendToken = (token) => {
+  const lastChar = expression.slice(-1);
+
+  if (token === "C") {
+    clearDisplay();
+    return;
+  }
+
+  if (token === "=") {
+    calculateResult();
+    return;
+  }
+
+  if (token === "%") {
+    applyPercent();
+    return;
+  }
+
+  if (token === "⌫") {
+    backspace();
+    return;
+  }
+
+  if (token === "()") {
+    appendParenthesis();
+    return;
+  }
+
+  if (["sin", "cos", "tan", "log", "ln"].includes(token)) {
+    expression += `${token}(`;
+    updateDisplay();
+    return;
+  }
+
+  if (token === "√") {
+    expression += "√(";
+    updateDisplay();
+    return;
+  }
+
+  if (token === "π") {
+    expression += "π";
+    updateDisplay();
+    return;
+  }
+
+  if (token === "mod") {
+    expression += "mod";
+    updateDisplay();
+    return;
+  }
+
+  if (token === "^") {
+    if (!expression || isOperator(lastChar) || lastChar === "(") return;
+    expression += "^";
+    updateDisplay();
+    return;
+  }
+
+  if (isOperator(token)) {
+    if (!expression) {
+      if (token === "-") {
+        expression = "-";
+        updateDisplay();
+      }
+      return;
+    }
+
+    if (isOperator(lastChar) || lastChar === "(") {
+      expression = expression.slice(0, -1) + token;
+    } else {
+      expression += token;
+    }
+    updateDisplay();
+    return;
+  }
+
+  if (token === ".") {
+    const currentNumber = expression.match(/(\d+\.?\d*)$/);
+    if (!currentNumber) {
+      expression += "0.";
+    } else if (!currentNumber[0].includes(".")) {
+      expression += ".";
+    }
+    updateDisplay();
+    return;
+  }
+
+  expression += token;
+  updateDisplay();
+};
+
 buttons.forEach((button) => {
   button.addEventListener("click", () => {
-    const value = button.textContent.trim();
-
-    if (value === "C") {
-      clearDisplay();
-      return;
-    }
-
-    if (value === "=") {
-      calculateResult();
-      return;
-    }
-
-    if (value === "%") {
-      applyPercent();
-      return;
-    }
-
-    appendToken(value);
+    appendToken(button.textContent.trim());
   });
 });
 
